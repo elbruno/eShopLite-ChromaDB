@@ -123,20 +123,39 @@ eShopLite is a reference .NET application that implements an eCommerce site with
 
 ### Running the Application
 
-1. **Clone the Repository**:
+- Clone the Repository:
 
    ```bash
    git clone https://github.com/elbruno/eShopLite-ChromaDB.git
    cd eShopLite-ChromaDB/src
    ```
 
-2. **Configure the Application**: Update the configuration files to include your Chroma DB connection settings.
-
-3. **Run the Application**:
+- Configure the Application: Add user secrets in Products project to connect to Azure OpenAI services.
 
    ```bash
-   dotnet run --project eShopLite-ChromaDB.sln
+    dotnet user-secrets init
+    dotnet user-secrets set "openai" "Endpoint=https://<endpoint>.openai.azure.com/;Key=<ApiKey>;" 
    ```
+
+- Navigate to the Aspire Host folder project using the command:
+
+  ```bash
+  cd ./src/eShopAppHost/
+  ```
+
+- If you are running the project in Codespaces, you need to run this command:
+
+  ```bash
+  dotnet dev-certs https --trust
+  ```
+
+- By default the AppHost project creates the necessary resources on Azure. Check the **[.NET Aspire Azure Resources creation](https://github.com/Azure-Samples/eShopLite-SemanticSearch/tree/main#net-aspire-azure-resources-creation)** section to learn how to configure the project to create Azure resources.
+
+- Run the project:
+
+  ```bash
+  dotnet run
+  ````
 
 ## Resources
 

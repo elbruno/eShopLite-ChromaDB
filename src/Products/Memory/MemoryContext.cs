@@ -69,7 +69,7 @@ public class MemoryContext
         }
 
         // add the products to the memory
-        await _collectionClient.Add(productIds, productDescriptionEmbeddings, productMetadata);
+        await _collectionClient.Upsert(productIds, productDescriptionEmbeddings, productMetadata);
 
         _logger.LogInformation("DONE! Filling products in memory");
         return true;

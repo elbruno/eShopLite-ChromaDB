@@ -53,18 +53,16 @@ eShopLite is a reference .NET application that implements an eCommerce site with
    var configOptions = new ChromaConfigurationOptions(uri: $"{chromaDbUri}/api/v1/");
    _httpChromaClient = new HttpClient();
    var client = new ChromaClient(configOptions, _httpChromaClient);
-   var collection = await client.GetOrCreateCollection("products");
-   _collectionClient = new ChromaCollectionClient(collection, configOptions, _httpChromaClient);
    ```
 
 1. **Create a Collection**: Create a collection in Chroma DB to store your product data.
 
    ```csharp
    var collection = await client.GetOrCreateCollection("products");
-   var collectionClient = new ChromaCollectionClient(collection, configOptions, httpClient);
+   _collectionClient = new ChromaCollectionClient(collection, configOptions, _httpChromaClient);
    ```
 
-4. **Add Data to the Collection**: Add your product data, including embeddings and metadata, to the collection.
+1. **Add Data to the Collection**: Add your product data, including embeddings and metadata, to the collection.
 
    ```csharp
     var productIds = new List<string>();
@@ -92,6 +90,35 @@ eShopLite is a reference .NET application that implements an eCommerce site with
     // add the products to the memory
     await _collectionClient.Upsert(productIds, productDescriptionEmbeddings, productMetadata);
 
+   ```
+
+1. **Search products**: search the products using the Chroma DB client.
+
+   ```csharp
+    var resultGenEmbeddings = await _embeddingClient.GenerateEmbeddingAsync(search);
+    var embeddingsSearchQuery = resultGenEmbeddings.Value.ToFloats();
+
+    var searchOptions = new VectorSearchOptions
+    {
+        Top = 1,
+        VectorPropertyName = "Vector"
+    };
+
+    // search the vector database for the most similar product        
+    var queryResult = await _collectionClient.Query(
+        queryEmbeddings: embeddingsSearchQuery,
+        nResults: 2,
+        include: ChromaQueryInclude.Metadatas | ChromaQueryInclude.Distances);
+
+    var sbFoundProducts = new StringBuilder();
+    int productPosition = 1;
+    foreach (var result in queryResult)
+    {
+        if (result.Distance > 0.3)
+        {
+            // product found, magic happens here
+        }
+    }
    ```
 
 ### Running the Application

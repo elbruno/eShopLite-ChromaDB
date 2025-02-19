@@ -47,9 +47,14 @@ eShopLite is a reference .NET application that implements an eCommerce site with
    ```csharp
    using ChromaDB.Client;
 
-   var configOptions = new ChromaConfigurationOptions(uri: "http://localhost:8000/api/v1/");
-   using var httpClient = new HttpClient();
-   var client = new ChromaClient(configOptions, httpClient);
+   var chromaDbService = _config.GetSection("services:chroma:chromaendpoint:0");
+   var chromaDbUri = chromaDbService.Value;
+
+   var configOptions = new ChromaConfigurationOptions(uri: $"{chromaDbUri}/api/v1/");
+   _httpChromaClient = new HttpClient();
+   var client = new ChromaClient(configOptions, _httpChromaClient);
+   var collection = await client.GetOrCreateCollection("products");
+   _collectionClient = new ChromaCollectionClient(collection, configOptions, _httpChromaClient);
    ```
 
 1. **Create a Collection**: Create a collection in Chroma DB to store your product data.
@@ -62,11 +67,31 @@ eShopLite is a reference .NET application that implements an eCommerce site with
 4. **Add Data to the Collection**: Add your product data, including embeddings and metadata, to the collection.
 
    ```csharp
-   var ids = new List<string> { /* your product IDs */ }; 
-   var embeddings = new List<float[]> { /* your embeddings */ };
-   var metadatas = new List<Dictionary<string, object>> { /* your metadata */ };
+    var productIds = new List<string>();
+    var productDescriptionEmbeddings = new List<ReadOnlyMemory<float>>();
+    var productMetadata = new List<Dictionary<string, object>>();
 
-   await collectionClient.Add(ids, embeddings, metadatas);
+    // iterate over the products and add them to the memory
+    foreach (var product in products)
+    {
+        try
+        {
+            _logger.LogInformation("Adding product to memory: {Product}", product.Name);
+            var productInfo = $"[{product.Name}] is a product that costs [{product.Price}] and is described as [{product.Description}]";
+            var result = await _embeddingClient.GenerateEmbeddingAsync(productInfo);
+            productIds.Add(product.Id.ToString());
+            productDescriptionEmbeddings.Add(result.Value.ToFloats());
+            _logger.LogInformation($"Product added to collections: {product.Name}");
+        }
+        catch (Exception exc)
+        {
+            _logger.LogError(exc, "Error adding product to memory");
+        }
+    }
+
+    // add the products to the memory
+    await _collectionClient.Upsert(productIds, productDescriptionEmbeddings, productMetadata);
+
    ```
 
 ### Running the Application

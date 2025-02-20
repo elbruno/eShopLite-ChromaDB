@@ -8,14 +8,15 @@ var sqldb = builder.AddSqlServer("sql")
 
 var chromaDB = builder.AddContainer("chroma", "chromadb/chroma")
     .WithHttpEndpoint(port: 8000, targetPort: 8000, name: "chromaendpoint")
-    .WithLifetime(ContainerLifetime.Persistent);
+    .WithLifetime(ContainerLifetime.Persistent)
+    .PublishAsContainer();
 
 var endpoint = chromaDB.GetEndpoint("chromaendpoint");
 
 var products = builder.AddProject<Projects.Products>("products")
     .WithReference(endpoint)
     .WithReference(sqldb)
-    .WaitFor(sqldb);
+    .WaitFor(sqldb); 
 
 var store = builder.AddProject<Projects.Store>("store")
     .WithReference(products)

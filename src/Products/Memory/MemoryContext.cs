@@ -16,32 +16,22 @@ public class MemoryContext
     private const string SystemPrompt = "You are a useful assistant. You always reply with a short and funny message. If you do not know an answer, you say 'I don't know that.' You only answer questions related to outdoor camping products. For any other type of questions, explain to the user that you only answer outdoor camping products questions. Do not store memory of the chat conversation.";
 
     private readonly ILogger _logger;
-    private readonly IConfiguration _config;
     private readonly ChatClient? _chatClient;
     private readonly EmbeddingClient? _embeddingClient;
 
     private bool _isMemoryCollectionInitialized = false;
     private ChromaCollectionClient? _collectionClient;
-    private HttpClient? _httpChromaClient;
 
-    public MemoryContext(ILogger logger, IConfiguration config, ChatClient? chatClient, EmbeddingClient? embeddingClient)
+    public MemoryContext(ILogger logger, ChatClient? chatClient, EmbeddingClient? embeddingClient, ChromaCollectionClient? collectionClient)
     {
         _logger = logger;
-        _config = config;
         _chatClient = chatClient;
         _embeddingClient = embeddingClient;
+        _collectionClient = collectionClient;
     }
 
     public async Task<bool> InitMemoryContextAsync(Context db)
     {
-        string? chromaDbUri = GetChromaDbUri();
-
-        var configOptions = new ChromaConfigurationOptions(uri: chromaDbUri);
-        _httpChromaClient = new HttpClient();
-        var client = new ChromaClient(configOptions, _httpChromaClient);
-        var collection = await client.GetOrCreateCollection("products");
-        _collectionClient = new ChromaCollectionClient(collection, configOptions, _httpChromaClient);
-
         _logger.LogInformation("Get a copy of the list of products");
         var products = await db.Product.ToListAsync();
 
@@ -74,25 +64,6 @@ public class MemoryContext
 
         _logger.LogInformation("DONE! Filling products in memory");
         return true;
-    }
-
-    private string GetChromaDbUri()
-    {
-        var chromaDbUri = string.Empty;
-
-        _logger.LogInformation("Get ChromaDb from services");
-        var chromaDbService = _config.GetSection("services:chroma:chromaendpoint:0");
-        chromaDbUri = chromaDbService.Value;
-        _logger.LogInformation($"ChromaDB client configuration, key: {chromaDbService.Key}");
-
-        if (!string.IsNullOrEmpty(chromaDbUri) && !chromaDbUri.EndsWith("/api/v1/"))
-        {
-            _logger.LogInformation("ChromaDB connection string does not end with /api/v1/, adding it");
-            chromaDbUri += "/api/v1/";
-        }
-
-        _logger.LogInformation($"ChromaDB client uri: {chromaDbUri}");
-        return chromaDbUri;
     }
 
     public async Task<SearchResponse> Search(string search, Context db)

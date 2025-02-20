@@ -24,7 +24,7 @@ builder.Services.AddProblemDetails();
 // Add DbContext service
 builder.AddSqlServerDbContext<Context>("sqldb");
 
-// in dev scenarios rename this to "openaidev", and check the documentation to reuse existing AOAI resources
+// in dev scenarios add "openai" user secrets info, check the official doc for the necessary steps
 var azureOpenAiClientName = "openai";
 builder.AddAzureOpenAIClient(azureOpenAiClientName);
 
@@ -66,28 +66,40 @@ builder.Services.AddSingleton<EmbeddingClient>(serviceProvider =>
     return embeddingsClient;
 });
 
-// get the ChromaDB Client
-builder.Services.AddSingleton<ChromaClient>(serviceProvider =>
+// get the ChromaDB Collection Client
+builder.Services.AddSingleton<ChromaCollectionClient>(serviceProvider =>
 {
     var logger = serviceProvider.GetService<ILogger<Program>>()!;
-    ChromaClient chromaDbClient = null;
+    var config = serviceProvider.GetService<IConfiguration>()!;
+    ChromaCollectionClient chromaCollectionClient = null;
     try
     {
-        // get from builder.Configuration the service named chromadb
-        var chromaDbService = builder.Configuration.GetSection("services").GetChildren()
-            .FirstOrDefault(s => s["name"] == "chroma");
-        logger.LogInformation($"ChromaDB client configuration, : {chromaDbService}");
-        logger.LogInformation($"ChromaDB client configuration, uri: {chromaDbService["uri"]}");
+        // get chromaDB service Uri from configuration
+        var chromaDbService = config.GetSection("services:chroma:chromaendpoint:0");
+        var chromaDbUri = chromaDbService.Value;
+        logger.LogInformation($"ChromaDB client configuration, key: {chromaDbService.Key}");
+        logger.LogInformation($"ChromaDB client configuration, value: {chromaDbService.Value}");
 
-        var configOptions = new ChromaConfigurationOptions(uri: "http://localhost:8000/api/v1/");
-        using var httpClient = new HttpClient();
-        var client = new ChromaClient(configOptions, httpClient);
+        if (!string.IsNullOrEmpty(chromaDbUri) && !chromaDbUri.EndsWith("/api/v1/"))
+        {
+            logger.LogInformation("ChromaDB connection string does not end with /api/v1/, adding it");
+            chromaDbUri += "/api/v1/";
+        }
+        logger.LogInformation($"ChromaDB client uri: {chromaDbUri}");
+
+
+        // 
+        var configOptions = new ChromaConfigurationOptions(uri: chromaDbUri);
+        var httpChromaClient = new HttpClient();
+        var chromaClient = new ChromaClient(configOptions, httpChromaClient);
+        var collection = chromaClient.GetOrCreateCollection("products").Result;
+        chromaCollectionClient = new ChromaCollectionClient(collection, configOptions, httpChromaClient);
     }
     catch (Exception exc)
     {
         logger.LogError(exc, "Error creating chromaDB client");
     }
-    return chromaDbClient;
+    return chromaCollectionClient;
 });
 
 builder.Services.AddSingleton<IConfiguration>(sp =>
@@ -102,9 +114,9 @@ builder.Services.AddSingleton(sp =>
     logger.LogInformation("Creating memory context");
     return new MemoryContext(
         logger,
-        sp.GetService<IConfiguration>(),
         sp.GetService<ChatClient>(), 
-        sp.GetService<EmbeddingClient>());
+        sp.GetService<EmbeddingClient>(),
+        sp.GetService<ChromaCollectionClient>());
 });
 
 // Add services to the container.
